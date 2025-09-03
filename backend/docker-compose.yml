@@ -1,0 +1,21 @@
+services:
+  keylotto:
+    container_name: keylotto-backend
+    build: .
+    working_dir: /app
+    command: bun run dev
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-3000}:3000"
+      - "${DOCS_PORT:-3001}:3001"
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./ocr-service/app/cli.py:/app/python/ocr_cli.py
+      - ./ocr-service/requirements.txt:/app/python-requirements.txt
+
+# networks:
+#   web_network:
+#     external: true

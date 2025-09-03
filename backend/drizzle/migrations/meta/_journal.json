@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1756901043084,
+      "tag": "0000_messy_argent",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1756902175560,
+      "tag": "0001_organic_reaper",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1756902617630,
+      "tag": "0002_peaceful_joshua_kane",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1756904464636,
+      "tag": "0003_mixed_diamondback",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1756905085371,
+      "tag": "0004_nosy_the_fury",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1756906410867,
+      "tag": "0005_watery_the_renegades",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1756908037019,
+      "tag": "0006_ancient_red_skull",
+      "breakpoints": true
+    }
+  ]
+}
