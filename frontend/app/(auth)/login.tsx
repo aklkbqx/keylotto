@@ -3,61 +3,52 @@ import { View, Text, Pressable, KeyboardAvoidingView, Platform, ActivityIndicato
 import { router, Link } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import tw from '@/libs/constants/twrnc';
+import tw from '@/libs/utils/tailwind';
 import Container from '@/libs/components/Container';
 import TextInput from '@/libs/components/TextInput';
 import Button from '@/libs/components/Button';
-import { useAuthStore } from '@/libs/stores/authStore';
 import { apiPostData, handleApiError } from '@/libs/utils/API_URILS';
-import Toast from 'react-native-toast-message';
-import LottieView from 'lottie-react-native';
+import { useAuth } from '@/libs/providers/AuthProvider';
+import { useToast } from '@/libs/providers/ToastProvider';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { setAuth } = useAuthStore();
+  const { login } = useAuth();
+  const { showError, showSuccess, showInfo } = useToast();
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Toast.show({
-        type: 'error',
-        text1: 'กรุณากรอกข้อมูลให้ครบ',
-        text2: 'ต้องกรอกอีเมลและรหัสผ่าน',
-      });
+      showError('กรุณากรอกข้อมูลให้ครบ', 'ต้องกรอกอีเมลและรหัสผ่าน');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await apiPostData('/api/auth/login', {
-        email,
-        password,
-      });
+      const response = await login(email, password);
 
       if (response.success) {
-        setAuth(response.data.token, response.data.user);
-        Toast.show({
-          type: 'success',
-          text1: 'เข้าสู่ระบบสำเร็จ',
-          text2: `ยินดีต้อนรับคุณ ${response.data.user.name}`,
-        });
+        showSuccess('เข้าสู่ระบบสำเร็จ', `ยินดีต้อนรับคุณ ${response.data?.name || ''}`);
         router.replace('/user/lottery-check');
+      } else {
+        showError('เข้าสู่ระบบไม่สำเร็จ', response.message || 'กรุณาตรวจสอบข้อมูลอีกครั้ง');
       }
     } catch (error) {
-      handleApiError(error);
+      handleApiError(
+        error,
+        (message) => {
+          showError('เข้าสู่ระบบไม่สำเร็จ', message);
+        }
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleSocialLogin = (provider: string) => {
-    Toast.show({
-      type: 'info',
-      text1: `กำลังเข้าสู่ระบบด้วย ${provider}`,
-      text2: 'ฟีเจอร์นี้กำลังพัฒนา',
-    });
+    showInfo(`กำลังเข้าสู่ระบบด้วย ${provider}`, 'ฟีเจอร์นี้กำลังพัฒนา');
   };
 
   return (
