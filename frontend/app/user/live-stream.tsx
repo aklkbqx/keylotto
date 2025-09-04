@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, Dimensions, ActivityIndicator } from
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import tw from '@/libs/utils/tailwind';
+import tw from '@/libs/constants/twrnc';
 import Container from '@/libs/components/Container';
 import { apiGetData, handleApiError } from '@/libs/utils/API_URILS';
 import { format } from 'date-fns';

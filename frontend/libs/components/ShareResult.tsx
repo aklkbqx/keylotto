@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
-import tw from '@/libs/utils/tailwind';
+import tw from '@/libs/constants/twrnc';
 import Toast from 'react-native-toast-message';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';

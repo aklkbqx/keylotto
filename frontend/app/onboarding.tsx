@@ -3,7 +3,7 @@ import { View, Text, Pressable, Dimensions, Image } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import tw from '@/libs/utils/tailwind';
+import tw from '@/libs/constants/twrnc';
 import Container from '@/libs/components/Container';
 import Button from '@/libs/components/Button';
 import Animated, { 

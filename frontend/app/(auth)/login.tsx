@@ -3,7 +3,7 @@ import { View, Text, Pressable, KeyboardAvoidingView, Platform, ActivityIndicato
 import { router, Link } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import tw from '@/libs/utils/tailwind';
+import tw from '@/libs/constants/twrnc';
 import Container from '@/libs/components/Container';
 import TextInput from '@/libs/components/TextInput';
 import Button from '@/libs/components/Button';
