@@ -21,8 +21,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         bundleIdentifier: appBundleIdentifier,
         supportsTablet: true,
         infoPlist: {
-            NSCameraUsageDescription: "แอปนี้ต้องการเข้าถึงกล้องเพื่อถ่ายรูปโปรไฟล์และเนื้อหาในบันทึก",
-            NSPhotoLibraryUsageDescription: "แอปนี้ต้องการเข้าถึงรูปภาพเพื่ออัปโหลดรูปโปรไฟล์ ภาพไพ่/บันทึก และแชร์ผลการทำนาย",
+            NSCameraUsageDescription: "แอป KeyLotto ต้องการเข้าถึงกล้องเพื่อสแกน QR Code และถ่ายรูปใบลอตเตอรี่",
+            NSPhotoLibraryUsageDescription: "แอป KeyLotto ต้องการเข้าถึงรูปภาพเพื่อเลือกรูปใบลอตเตอรี่และบันทึกผลการตรวจหวย",
+            NSPhotoLibraryAddUsageDescription: "แอป KeyLotto ต้องการบันทึกรูปผลการตรวจหวยลงในอัลบั้มของคุณ",
             ITSAppUsesNonExemptEncryption: false
         },
     },
@@ -34,6 +35,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
         edgeToEdgeEnabled: true,
         permissions: [
+            'CAMERA',
+            'READ_EXTERNAL_STORAGE',
+            'WRITE_EXTERNAL_STORAGE',
             'READ_MEDIA_IMAGES',
             'POST_NOTIFICATIONS',
             'INTERNET',
@@ -51,10 +55,30 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         'expo-font',
         "expo-secure-store",
         [
+            'expo-camera',
+            {
+                cameraPermission: 'แอป KeyLotto ต้องการเข้าถึงกล้องเพื่อสแกน QR Code และถ่ายรูปใบลอตเตอรี่',
+            }
+        ],
+        [
+            'expo-barcode-scanner',
+            {
+                cameraPermission: 'แอป KeyLotto ต้องการเข้าถึงกล้องเพื่อสแกน QR Code บนใบลอตเตอรี่',
+            }
+        ],
+        [
             'expo-image-picker',
             {
-                photosPermission: 'แอปนี้ต้องการเข้าถึงรูปภาพเพื่ออัปโหลดรูปโปรไฟล์และเนื้อหา',
-                cameraPermission: 'แอปนี้ต้องการเข้าถึงกล้องเพื่อถ่ายรูปโปรไฟล์และเนื้อหา',
+                photosPermission: 'แอป KeyLotto ต้องการเข้าถึงรูปภาพเพื่อเลือกรูปใบลอตเตอรี่',
+                cameraPermission: 'แอป KeyLotto ต้องการเข้าถึงกล้องเพื่อถ่ายรูปใบลอตเตอรี่',
+            }
+        ],
+        [
+            'expo-media-library',
+            {
+                photosPermission: 'แอป KeyLotto ต้องการบันทึกรูปผลการตรวจหวยลงในอัลบั้มของคุณ',
+                savePhotosPermission: 'แอป KeyLotto ต้องการบันทึกรูปผลการตรวจหวย',
+                isAccessMediaLocationEnabled: true,
             }
         ],
         [
