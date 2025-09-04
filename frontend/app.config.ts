@@ -58,12 +58,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
             'expo-camera',
             {
                 cameraPermission: 'แอป KeyLotto ต้องการเข้าถึงกล้องเพื่อสแกน QR Code และถ่ายรูปใบลอตเตอรี่',
-            }
-        ],
-        [
-            'expo-barcode-scanner',
-            {
-                cameraPermission: 'แอป KeyLotto ต้องการเข้าถึงกล้องเพื่อสแกน QR Code บนใบลอตเตอรี่',
+                microphonePermission: 'แอป KeyLotto ต้องการเข้าถึงไมโครโฟน (ไม่จำเป็น)',
             }
         ],
         [

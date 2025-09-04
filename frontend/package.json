@@ -8,7 +8,12 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "clean": "rm -rf node_modules && npm cache clean --force",
+    "clean:ios": "cd ios && rm -rf Pods build && pod cache clean --all && cd ..",
+    "clean:android": "cd android && ./gradlew clean && cd ..",
+    "prebuild": "expo prebuild --clean",
+    "fix:ios": "npm run clean && npm install && cd ios && pod install --repo-update && cd .."
   },
   "dependencies": {
     "@expo-google-fonts/aboreto": "^0.4.0",

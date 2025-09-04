@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, Pressable } from 'react-native';
-import { Camera, CameraType, BarCodeScanningResult } from 'expo-camera';
-import { BarCodeScanner } from 'expo-barcode-scanner';
+import { Camera, CameraType, BarCodeScanningResult, BarCodeScanner } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
