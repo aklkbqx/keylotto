@@ -1,243 +1,199 @@
-import React, { useCallback, useState } from "react";
-import { Image, View, TouchableOpacity, Alert } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { z } from "zod";
-import Container from "@/libs/components/Container";
-import Text from "@/libs/components/Text";
-import TextInput from "@/libs/components/TextInput";
-import { useAuth } from "@/libs/providers/AuthProvider";
-import { useToast } from "@/libs/providers/ToastProvider";
-import useSpecialFont from "@/libs/hooks/useSpecialFont";
-import tw from "@/libs/constants/twrnc";
-import { useTheme } from "@/libs/providers/ThemeProvider";
-import { router } from "expo-router";
-
-// Zod schema for login validation
-const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, "กรุณากรอกอีเมล")
-    .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "รูปแบบอีเมลไม่ถูกต้อง"),
-  password: z
-    .string()
-    .min(1, "กรุณากรอกรหัสผ่าน")
-    .min(6, "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร"),
-});
+import React, { useState } from 'react';
+import { View, Text, Pressable, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { router, Link } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import tw from '@/libs/utils/tailwind';
+import Container from '@/libs/components/Container';
+import TextInput from '@/libs/components/TextInput';
+import Button from '@/libs/components/Button';
+import { useAuthStore } from '@/libs/stores/authStore';
+import { apiPostData, handleApiError } from '@/libs/utils/API_URILS';
+import Toast from 'react-native-toast-message';
+import LottieView from 'lottie-react-native';
 
 export default function LoginScreen() {
-  const { login, isLoading } = useAuth();
-  const { showToast } = useToast();
-  const { fontFamily: astrologyFont } = useSpecialFont('astrology');
-  const { palette } = useTheme();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { setAuth } = useAuthStore();
 
-  const onSubmit = useCallback(async () => {
-    // Clear previous errors
-    setErrors({});
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Toast.show({
+        type: 'error',
+        text1: 'กรุณากรอกข้อมูลให้ครบ',
+        text2: 'ต้องกรอกอีเมลและรหัสผ่าน',
+      });
+      return;
+    }
 
-    // Zod validation
+    setLoading(true);
     try {
-      const validatedData = loginSchema.parse({ email, password });
+      const response = await apiPostData('/api/auth/login', {
+        email,
+        password,
+      });
 
-      setIsSubmitting(true);
-      try {
-        const result = await login(validatedData.email, validatedData.password);
-
-        if (result.success) {
-          showToast("success", "สำเร็จ!", "เข้าสู่ระบบสำเร็จ");
-          if (result.data?.role == "admin") {
-            router.replace("/admin/dashboard");
-          } else {
-            router.replace("/user/home");
-          }
-
-        } else {
-          showToast("error", "เข้าสู่ระบบไม่สำเร็จ", result.message || "กรุณาลองใหม่อีกครั้ง");
-        }
-      } catch (error) {
-        showToast("error", "ข้อผิดพลาด", "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
-        console.error("Login error:", error);
-      } finally {
-        setIsSubmitting(false);
+      if (response.success) {
+        setAuth(response.data.token, response.data.user);
+        Toast.show({
+          type: 'success',
+          text1: 'เข้าสู่ระบบสำเร็จ',
+          text2: `ยินดีต้อนรับคุณ ${response.data.user.name}`,
+        });
+        router.replace('/user/lottery-check');
       }
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        const fieldErrors: { email?: string; password?: string } = {};
-        error.issues.forEach((err) => {
-          if (err.path[0] === 'email') {
-            fieldErrors.email = err.message;
-          } else if (err.path[0] === 'password') {
-            fieldErrors.password = err.message;
-          }
-        });
-        setErrors(fieldErrors);
-
-        // Show first error in toast
-        const firstError = error.issues[0];
-        showToast("error", "ข้อมูลไม่ถูกต้อง", firstError.message);
-      }
+      handleApiError(error);
+    } finally {
+      setLoading(false);
     }
-  }, [email, password, login, showToast]);
+  };
 
-  const handleGuestLogin = useCallback(() => {
-    // TODO: Implement guest login logic
-    console.log("Guest login");
-  }, []);
-
-  const handleGoogleLogin = useCallback(() => {
-    // TODO: Implement Google login logic
-    console.log("Google login");
-  }, []);
+  const handleSocialLogin = (provider: string) => {
+    Toast.show({
+      type: 'info',
+      text1: `กำลังเข้าสู่ระบบด้วย ${provider}`,
+      text2: 'ฟีเจอร์นี้กำลังพัฒนา',
+    });
+  };
 
   return (
-    <Container safeArea backgroundColor="#000" scroll={false} padding={0}>
-      <View style={tw`px-6 pt-15`}>
-        {/* Logo Section */}
-        <View style={tw`items-center mb-12`}>
-          <Image
-            source={require("@/assets/images/logo.png")}
-            style={{ width: 300, height: 120, resizeMode: 'contain', marginBottom: 8 }}
-          />
-          <Text
-            size="lg"
-            weight="regular"
-            color={String(tw.color('white'))}
-            style={[tw`tracking-[4px] text-center`, { fontFamily: astrologyFont }]}
-          >
-            ASTROLOGY
-          </Text>
-        </View>
-
-        {/* Form Section */}
-        <View style={tw`mb-6`}>
-          <View style={tw`mb-4`}>
-            <TextInput
-              placeholder="อีเมล"
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                // Clear error when user starts typing
-                if (errors.email) {
-                  setErrors(prev => ({ ...prev, email: undefined }));
-                }
-              }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              leftIcon={<Ionicons name="mail" size={20} color={String(tw.color('gray-400'))} style={tw`mr-2`} />}
-              containerStyle={tw`rounded-full`}
-              fieldStyle={{ color: String(tw.color('white')) }}
-              placeholderColor={String(tw.color('gray-400'))}
-              backgroundColor={String(tw.color('stone-600/50'))}
-              borderColor={errors.email ? String(tw.color('red-500')) : "transparent"}
-              error={!!errors.email}
-              errorMessage={errors.email}
-              required
-            />
+    <Container>
+      <LinearGradient
+        colors={['#FFD700', '#FFA500', '#FF6B6B']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={tw`absolute inset-0`}
+      />
+      
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={tw`flex-1`}
+      >
+        <View style={tw`flex-1 px-6 justify-center`}>
+          {/* Logo & Title */}
+          <View style={tw`items-center mb-8`}>
+            <View style={tw`w-32 h-32 bg-white/20 rounded-full items-center justify-center mb-4`}>
+              <Text style={tw`text-6xl`}>🎰</Text>
+            </View>
+            <Text style={tw`text-3xl font-bold text-white font-aboreto`}>KeyLotto</Text>
+            <Text style={tw`text-white/80 mt-2`}>หวยมีคีย์ ให้โชคทุกงวด</Text>
           </View>
 
-          <View style={tw`mb-6`}>
-            <TextInput
-              placeholder="รหัสผ่าน"
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                // Clear error when user starts typing
-                if (errors.password) {
-                  setErrors(prev => ({ ...prev, password: undefined }));
-                }
-              }}
-              secureTextEntry
-              autoComplete="password"
-              leftIcon={<Ionicons name="lock-closed" size={20} color={String(tw.color('gray-400'))} style={tw`mr-2`} />}
-              containerStyle={tw`rounded-full`}
-              fieldStyle={{ color: String(tw.color('white')) }}
-              placeholderColor={String(tw.color('gray-400'))}
-              backgroundColor={String(tw.color('stone-600/50'))}
-              borderColor={errors.password ? String(tw.color('red-500')) : "transparent"}
-              error={!!errors.password}
-              errorMessage={errors.password}
-              required
-            />
-          </View>
-
-          {/* Login Button */}
-          <TouchableOpacity
-            onPress={onSubmit}
-            disabled={isSubmitting || isLoading}
-            style={[
-              tw`bg-white rounded-full py-4 mb-6`,
-              (isSubmitting || isLoading) && tw`opacity-70`
-            ]}
-          >
-            <Text
-              size="base"
-              weight="semibold"
-              color="#000"
-              style={tw`text-center`}
-            >
-              {isSubmitting ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+          {/* Login Form */}
+          <View style={tw`bg-white/95 rounded-3xl p-6 shadow-xl`}>
+            <Text style={tw`text-2xl font-bold text-center mb-6 text-primary-600`}>
+              เข้าสู่ระบบ
             </Text>
-          </TouchableOpacity>
-        </View>
 
-        {/* Divider */}
-        <View style={tw`flex-row items-center mb-6`}>
-          <View style={tw`flex-1 h-px bg-gray-600`} />
-          <View style={tw`w-2 h-2 rounded-full bg-gray-600`} />
-          <Text size="sm" color={String(tw.color('gray-400'))} style={tw`mx-4`}>
-            ลงชื่อเข้าใช้
-          </Text>
-          <View style={tw`w-2 h-2 rounded-full bg-gray-600`} />
-          <View style={tw`flex-1 h-px bg-gray-600`} />
-        </View>
+            {/* Email Input */}
+            <View style={tw`mb-4`}>
+              <View style={tw`flex-row items-center bg-gray-50 rounded-xl px-4 py-3`}>
+                <Ionicons name="mail-outline" size={20} color="#666" />
+                <TextInput
+                  placeholder="อีเมล"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={tw`flex-1 ml-3`}
+                />
+              </View>
+            </View>
 
-        {/* Guest Login Button */}
-        <TouchableOpacity
-          onPress={handleGuestLogin}
-          style={tw`bg-transparent border border-gray-600 rounded-full py-3 mb-4`}
-        >
-          <Text
-            size="base"
-            weight="regular"
-            color={String(tw.color('white'))}
-            style={tw`text-center`}
+            {/* Password Input */}
+            <View style={tw`mb-6`}>
+              <View style={tw`flex-row items-center bg-gray-50 rounded-xl px-4 py-3`}>
+                <Ionicons name="lock-closed-outline" size={20} color="#666" />
+                <TextInput
+                  placeholder="รหัสผ่าน"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  style={tw`flex-1 ml-3`}
+                />
+                <Pressable onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons 
+                    name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                    size={20} 
+                    color="#666" 
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Forgot Password */}
+            <Link href="/forgot-password" asChild>
+              <Pressable style={tw`mb-6`}>
+                <Text style={tw`text-primary-600 text-center`}>ลืมรหัสผ่าน?</Text>
+              </Pressable>
+            </Link>
+
+            {/* Login Button */}
+            <Button
+              onPress={handleLogin}
+              disabled={loading}
+              style={tw`mb-4`}
+            >
+              {loading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={tw`text-white font-bold text-lg`}>เข้าสู่ระบบ</Text>
+              )}
+            </Button>
+
+            {/* Divider */}
+            <View style={tw`flex-row items-center my-4`}>
+              <View style={tw`flex-1 h-px bg-gray-300`} />
+              <Text style={tw`mx-4 text-gray-500`}>หรือ</Text>
+              <View style={tw`flex-1 h-px bg-gray-300`} />
+            </View>
+
+            {/* Social Login */}
+            <View style={tw`flex-row justify-center gap-4 mb-4`}>
+              <Pressable 
+                onPress={() => handleSocialLogin('Facebook')}
+                style={tw`w-12 h-12 bg-blue-600 rounded-full items-center justify-center`}
+              >
+                <Ionicons name="logo-facebook" size={24} color="white" />
+              </Pressable>
+              <Pressable 
+                onPress={() => handleSocialLogin('Google')}
+                style={tw`w-12 h-12 bg-red-500 rounded-full items-center justify-center`}
+              >
+                <Ionicons name="logo-google" size={24} color="white" />
+              </Pressable>
+              <Pressable 
+                onPress={() => handleSocialLogin('Apple')}
+                style={tw`w-12 h-12 bg-black rounded-full items-center justify-center`}
+              >
+                <Ionicons name="logo-apple" size={24} color="white" />
+              </Pressable>
+            </View>
+
+            {/* Register Link */}
+            <View style={tw`flex-row justify-center`}>
+              <Text style={tw`text-gray-600`}>ยังไม่มีบัญชี? </Text>
+              <Link href="/register" asChild>
+                <Pressable>
+                  <Text style={tw`text-primary-600 font-bold`}>สมัครสมาชิก</Text>
+                </Pressable>
+              </Link>
+            </View>
+          </View>
+
+          {/* Skip Login */}
+          <Pressable 
+            onPress={() => router.replace('/user/lottery-check')}
+            style={tw`mt-6`}
           >
-            กดลองใช้งาน
-          </Text>
-        </TouchableOpacity>
-
-        {/* Google Login Button */}
-        <TouchableOpacity
-          onPress={handleGoogleLogin}
-          style={tw`bg-stone-200 rounded-full py-1 mb-6 flex-row items-center justify-center`}
-        >
-          <Text
-            size="lg"
-            weight="bold"
-            style={tw`text-center`}
-          >
-            <Text size={"3xl"} style={{ color: '#4285F4' }}>G</Text>
-            <Text size={"3xl"} style={{ color: '#EA4335' }}>o</Text>
-            <Text size={"3xl"} style={{ color: '#FBBC05' }}>o</Text>
-            <Text size={"3xl"} style={{ color: '#4285F4' }}>g</Text>
-            <Text size={"3xl"} style={{ color: '#34A853' }}>l</Text>
-            <Text size={"3xl"} style={{ color: '#EA4335' }}>e</Text>
-          </Text>
-        </TouchableOpacity>
-
-        <View style={tw`flex-row gap-1 justify-center items-center`}>
-          <Text>หากยังไม่มีบัญชี</Text>
-          <TouchableOpacity onPress={() => router.replace("/register")} style={tw`flex-row justify-center`}>
-            <Text color={palette.primary}>สมัครสมาชิก</Text>
-          </TouchableOpacity>
+            <Text style={tw`text-white text-center`}>ข้ามการเข้าสู่ระบบ →</Text>
+          </Pressable>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Container>
   );
 }
-
-
