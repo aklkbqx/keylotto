@@ -6,7 +6,8 @@ import Container from '@/libs/components/Container';
 import Text from '@/libs/components/Text';
 import tw from '@/libs/constants/twrnc';
 import { useAuth } from '@/libs/providers/AuthProvider';
-import axios from 'axios';
+import { apiGetData, handleApiError } from '@/libs/utils/API_URILS';
+import { useToast } from '@/libs/providers/ToastProvider';
 
 interface HistoryItem {
   id: number;
@@ -19,6 +20,7 @@ interface HistoryItem {
 
 const HistoryScreen = () => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'win' | 'near' | 'miss'>('all');
   const [isLoading, setIsLoading] = useState(false);
@@ -39,20 +41,20 @@ const HistoryScreen = () => {
   const fetchHistory = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/api/lottery/history`,
-        {
-          params: { filter },
-          headers: {
-            Authorization: `Bearer ${user?.token}`,
-          },
+      // API_UTILS จะจัดการ token อัตโนมัติจาก interceptor
+      const response = await apiGetData('/api/lottery/history', {
+        params: { filter }
+      });
+      
+      setHistory(response.history || []);
+      setStats(response.stats || { total: 0, win: 0, near: 0, miss: 0 });
+    } catch (error) {
+      handleApiError(
+        error,
+        (message) => {
+          showToast('error', 'เกิดข้อผิดพลาด', message);
         }
       );
-      
-      setHistory(response.data.history || []);
-      setStats(response.data.stats || { total: 0, win: 0, near: 0, miss: 0 });
-    } catch (error) {
-      console.error('Error fetching history:', error);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
