@@ -9,11 +9,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "clean": "rm -rf node_modules && npm cache clean --force",
-    "clean:ios": "cd ios && rm -rf Pods build && pod cache clean --all && cd ..",
-    "clean:android": "cd android && ./gradlew clean && cd ..",
-    "prebuild": "expo prebuild --clean",
-    "fix:ios": "npm run clean && npm install && cd ios && pod install --repo-update && cd .."
+    "prebuild": "expo prebuild --clean"
   },
   "dependencies": {
     "@expo-google-fonts/aboreto": "^0.4.0",
@@ -32,7 +28,6 @@
     "expo": "53.0.22",
     "expo-application": "~6.1.5",
     "expo-asset": "~11.1.7",
-    "expo-barcode-scanner": "^13.0.1",
     "expo-blur": "~14.1.5",
     "expo-build-properties": "~0.14.8",
     "expo-camera": "~16.1.11",
