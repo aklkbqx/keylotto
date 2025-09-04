@@ -3,7 +3,7 @@ import { View, Text, Pressable, KeyboardAvoidingView, Platform, ActivityIndicato
 import { router, Link } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import tw from '@/libs/utils/tailwind';
+import tw from '@/libs/constants/twrnc';
 import Container from '@/libs/components/Container';
 import TextInput from '@/libs/components/TextInput';
 import Button from '@/libs/components/Button';
@@ -30,7 +30,7 @@ export default function LoginScreen() {
       const response = await login(email, password);
 
       if (response.success) {
-        showSuccess('เข้าสู่ระบบสำเร็จ', `ยินดีต้อนรับคุณ ${response.data?.name || ''}`);
+        showSuccess('เข้าสู่ระบบสำเร็จ', `ยินดีต้อนรับคุณ ${response.data?.firstname || ''}`);
         router.replace('/user/lottery-check');
       } else {
         showError('เข้าสู่ระบบไม่สำเร็จ', response.message || 'กรุณาตรวจสอบข้อมูลอีกครั้ง');
@@ -117,11 +117,11 @@ export default function LoginScreen() {
             </View>
 
             {/* Forgot Password */}
-            <Link href="/forgot-password" asChild>
+            {/* <Link href="/forgot-password" asChild>
               <Pressable style={tw`mb-6`}>
                 <Text style={tw`text-primary-600 text-center`}>ลืมรหัสผ่าน?</Text>
               </Pressable>
-            </Link>
+            </Link> */}
 
             {/* Login Button */}
             <Button
