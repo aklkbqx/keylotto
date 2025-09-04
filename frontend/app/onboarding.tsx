@@ -6,8 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import tw from '@/libs/constants/twrnc';
 import Container from '@/libs/components/Container';
 import Button from '@/libs/components/Button';
-import Animated, { 
-  FadeInRight, 
+import Animated, {
+  FadeInRight,
   FadeOutLeft,
   useAnimatedStyle,
   withSpring,
@@ -24,7 +24,7 @@ interface OnboardingItem {
   subtitle: string;
   description: string;
   icon: string;
-  colors: string[];
+  colors: [string, string, string];
 }
 
 const onboardingData: OnboardingItem[] = [
@@ -116,27 +116,26 @@ export default function OnboardingScreen() {
         {/* Progress Bar */}
         <View style={tw`mt-20 mb-8`}>
           <View style={tw`h-1 bg-white/20 rounded-full overflow-hidden`}>
-            <Animated.View 
+            <Animated.View
               style={[
                 tw`h-full bg-white rounded-full`,
                 progressBarStyle
-              ]} 
+              ]}
             />
           </View>
           <View style={tw`flex-row justify-between mt-4`}>
             {onboardingData.map((item, index) => (
               <View
                 key={item.id}
-                style={tw`w-2 h-2 rounded-full ${
-                  index <= currentIndex ? 'bg-white' : 'bg-white/30'
-                }`}
+                style={tw`w-2 h-2 rounded-full ${index <= currentIndex ? 'bg-white' : 'bg-white/30'
+                  }`}
               />
             ))}
           </View>
         </View>
 
         {/* Content */}
-        <Animated.View 
+        <Animated.View
           entering={FadeInRight}
           exiting={FadeOutLeft}
           style={tw`flex-1 items-center justify-center`}
@@ -188,13 +187,12 @@ export default function OnboardingScreen() {
             onPress={handleNext}
             style={tw`bg-white rounded-full py-4 px-8 shadow-lg`}
           >
-            <Text style={tw`text-center text-lg font-bold ${
-              currentIndex === onboardingData.length - 1 
-                ? 'text-green-600' 
+            <Text style={tw`text-center text-lg font-bold ${currentIndex === onboardingData.length - 1
+                ? 'text-green-600'
                 : 'text-primary-600'
-            }`}>
-              {currentIndex === onboardingData.length - 1 
-                ? 'เริ่มใช้งาน' 
+              }`}>
+              {currentIndex === onboardingData.length - 1
+                ? 'เริ่มใช้งาน'
                 : 'ถัดไป'}
             </Text>
           </Pressable>

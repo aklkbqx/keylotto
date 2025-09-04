@@ -124,11 +124,11 @@ const LotteryCheckScreen = () => {
   };
 
   const handleScan = () => {
-    router.push('/user/scan');
+    // router.push('/user/scan');
   };
 
   const handleHistory = () => {
-    router.push('/user/history');
+    // router.push('/user/history');
   };
 
   const spin = rotateAnim.interpolate({

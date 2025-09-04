@@ -115,13 +115,6 @@ export default function UserLayout() {
           ),
         }}
       />
-      {/* Hide the old home screen */}
-      <Tabs.Screen
-        name="home"
-        options={{
-          href: null,
-        }}
-      />
     </Tabs>
   );
 }

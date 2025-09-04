@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, Pressable } from 'react-native';
-import { Camera, CameraType, BarCodeScanningResult, BarCodeScanner } from 'expo-camera';
+import { Camera, CameraType, BarcodeScanningResult } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,7 +27,7 @@ const ScanScreen = () => {
     })();
   }, []);
 
-  const handleBarCodeScanned = async ({ type, data }: BarCodeScanningResult) => {
+  const handleBarCodeScanned = async ({ type, data }: BarcodeScanningResult) => {
     if (scanned || isProcessing) return;
     
     setScanned(true);
@@ -126,7 +126,7 @@ const ScanScreen = () => {
     return (
       <Container>
         <View style={tw`flex-1 justify-center items-center bg-black p-6`}>
-          <Ionicons name="camera-off" size={64} color="#FFD700" />
+          <Ionicons name="camera" size={64} color="#FFD700" />
           <Text style={[tw`text-xl mt-4 text-center`, { color: '#FFD700' }]}>
             ไม่สามารถเข้าถึงกล้อง
           </Text>
