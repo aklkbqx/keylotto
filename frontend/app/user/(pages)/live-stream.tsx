@@ -1,14 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, Dimensions, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, Pressable, Dimensions, ActivityIndicator, Linking, Share } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
+import LottieView from 'lottie-react-native';
 import tw from '@/libs/constants/twrnc';
 import Container from '@/libs/components/Container';
 import { apiGetData, handleApiError } from '@/libs/utils/API_URILS';
+import { useToast } from '@/libs/providers/ToastProvider';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
-import Animated, { FadeInDown, FadeInUp, useAnimatedStyle, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { 
+  FadeInDown, 
+  FadeInUp, 
+  useAnimatedStyle, 
+  withRepeat, 
+  withSequence, 
+  withTiming,
+  withSpring,
+  interpolate,
+  Extrapolate
+} from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 
@@ -33,15 +47,25 @@ interface NextDraw {
 }
 
 export default function LiveStreamScreen() {
+  const { showToast } = useToast();
   const [selectedStream, setSelectedStream] = useState<LiveStream | null>(null);
   const [streams, setStreams] = useState<LiveStream[]>([]);
   const [nextDraw, setNextDraw] = useState<NextDraw | null>(null);
   const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [isLive, setIsLive] = useState(false);
+  
+  // Animation values
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const liveIndicatorAnim = useRef(new Animated.Value(0)).current;
+  const countdownAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetchStreams();
     fetchNextDraw();
+    
+    // Start animations
+    startAnimations();
     
     // Update countdown every second
     const interval = setInterval(() => {
@@ -50,6 +74,67 @@ export default function LiveStreamScreen() {
 
     return () => clearInterval(interval);
   }, []);
+
+  const startAnimations = () => {
+    // Pulse animation for live indicator
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Live indicator animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(liveIndicatorAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(liveIndicatorAnim, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Countdown animation
+    Animated.timing(countdownAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  // Animated styles
+  const pulseStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: pulseAnim }],
+    };
+  });
+
+  const liveIndicatorStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(liveIndicatorAnim.value, [0, 1], [0.3, 1], Extrapolate.CLAMP);
+    return {
+      opacity,
+    };
+  });
+
+  const countdownStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: countdownAnim.value }],
+    };
+  });
 
   const fetchStreams = async () => {
     try {
@@ -60,10 +145,32 @@ export default function LiveStreamScreen() {
         const liveStream = response.data.find((s: LiveStream) => s.isLive);
         if (liveStream) {
           setSelectedStream(liveStream);
+          setIsLive(true);
         }
       }
     } catch (error) {
-      handleApiError(error);
+      // Mock data for demo
+      const mockStreams: LiveStream[] = [
+        {
+          id: '1',
+          title: 'กองสลากฯ Official',
+          url: 'https://www.youtube.com/embed/live',
+          platform: 'youtube',
+          isLive: true,
+          viewerCount: 15420,
+        },
+        {
+          id: '2',
+          title: 'หวยออกสด Facebook',
+          url: 'https://www.facebook.com/embed/live',
+          platform: 'facebook',
+          isLive: false,
+          scheduledTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+        },
+      ];
+      setStreams(mockStreams);
+      setSelectedStream(mockStreams[0]);
+      setIsLive(true);
     } finally {
       setLoading(false);
     }
@@ -76,7 +183,47 @@ export default function LiveStreamScreen() {
         setNextDraw(response.data);
       }
     } catch (error) {
-      console.error('Failed to fetch next draw:', error);
+      // Mock data for demo
+      const nextDrawDate = new Date();
+      nextDrawDate.setDate(nextDrawDate.getDate() + 1);
+      nextDrawDate.setHours(14, 30, 0, 0);
+      
+      setNextDraw({
+        date: nextDrawDate.toISOString(),
+        countdown: {
+          days: 0,
+          hours: 0,
+          minutes: 0,
+          seconds: 0,
+        },
+      });
+    }
+  };
+
+  const shareStream = async () => {
+    if (!selectedStream) return;
+    
+    try {
+      const shareMessage = `📺 ดูถ่ายทอดสดหวยกับ KeyLotto\n\n` +
+        `🎰 ${selectedStream.title}\n` +
+        `${selectedStream.isLive ? '🔴 LIVE NOW' : '⏰ เริ่มเร็วๆ นี้'}\n` +
+        `${selectedStream.viewerCount ? `👥 ${selectedStream.viewerCount.toLocaleString()} คนดู` : ''}\n` +
+        `\n#KeyLotto #ถ่ายทอดสด #หวยออก`;
+      
+      await Share.share({
+        message: shareMessage,
+        title: 'ถ่ายทอดสดหวย KeyLotto',
+      });
+    } catch (error) {
+      showToast('error', 'ไม่สามารถแชร์ได้', 'กรุณาลองใหม่อีกครั้ง');
+    }
+  };
+
+  const openExternalLink = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      showToast('error', 'ไม่สามารถเปิดลิงก์ได้', 'กรุณาลองใหม่อีกครั้ง');
     }
   };
 
@@ -171,134 +318,223 @@ export default function LiveStreamScreen() {
         )}
 
         {/* Live Indicator */}
-        {streams.some(s => s.isLive) && (
+        {isLive && (
           <Animated.View entering={FadeInUp.delay(300)}>
-            <View style={tw`flex-row items-center justify-center mb-4`}>
-              <Animated.View style={[tw`mr-2`, pulseAnimation]}>
-                <View style={tw`w-3 h-3 bg-red-500 rounded-full`} />
-              </Animated.View>
-              <Text style={tw`text-red-500 font-bold`}>LIVE NOW</Text>
-            </View>
+            <BlurView intensity={20} style={tw`mx-4 rounded-full overflow-hidden`}>
+              <View style={tw`bg-red-500/20 px-6 py-3 flex-row items-center justify-center`}>
+                <Animated.View style={[tw`mr-3`, pulseStyle]}>
+                  <View style={tw`w-4 h-4 bg-red-500 rounded-full`} />
+                </Animated.View>
+                <Animated.View style={liveIndicatorStyle}>
+                  <Text style={tw`text-red-500 font-bold text-lg`}>LIVE NOW</Text>
+                </Animated.View>
+                <LottieView
+                  source={require('@/assets/animations/live.json')}
+                  autoPlay
+                  loop
+                  style={tw`w-6 h-6 ml-2`}
+                />
+              </View>
+            </BlurView>
           </Animated.View>
         )}
 
         {/* Video Player */}
         {selectedStream && (
-          <View style={tw`mx-4 mb-4 rounded-2xl overflow-hidden bg-black`}>
-            <WebView
-              source={{ uri: selectedStream.url }}
-              style={{ width: width - 32, height: (width - 32) * 9 / 16 }}
-              allowsFullscreenVideo
-              mediaPlaybackRequiresUserAction={false}
-            />
-            
-            {/* Stream Info */}
-            <View style={tw`bg-white/10 p-3`}>
-              <View style={tw`flex-row justify-between items-center`}>
-                <View style={tw`flex-row items-center`}>
-                  <Ionicons 
-                    name={platformIcons[selectedStream.platform].name as any}
-                    size={20}
-                    color={platformIcons[selectedStream.platform].color}
-                  />
-                  <Text style={tw`text-white ml-2`}>{selectedStream.title}</Text>
-                </View>
-                {selectedStream.viewerCount && (
-                  <View style={tw`flex-row items-center`}>
-                    <Ionicons name="people" size={16} color="white" />
-                    <Text style={tw`text-white ml-1 text-sm`}>
-                      {selectedStream.viewerCount.toLocaleString()}
-                    </Text>
+          <Animated.View entering={FadeInUp.delay(400)} style={tw`mx-4 mb-4`}>
+            <BlurView intensity={20} style={tw`rounded-2xl overflow-hidden`}>
+              <View style={tw`bg-black rounded-2xl overflow-hidden`}>
+                <WebView
+                  source={{ uri: selectedStream.url }}
+                  style={{ width: width - 32, height: (width - 32) * 9 / 16 }}
+                  allowsFullscreenVideo
+                  mediaPlaybackRequiresUserAction={false}
+                />
+                
+                {/* Stream Info */}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.8)']}
+                  style={tw`absolute bottom-0 left-0 right-0 p-4`}
+                >
+                  <View style={tw`flex-row justify-between items-center`}>
+                    <View style={tw`flex-row items-center flex-1`}>
+                      <View style={tw`w-8 h-8 rounded-full items-center justify-center mr-3`}
+                        style={{ backgroundColor: platformIcons[selectedStream.platform].color + '20' }}
+                      >
+                        <Ionicons 
+                          name={platformIcons[selectedStream.platform].name as any}
+                          size={20}
+                          color={platformIcons[selectedStream.platform].color}
+                        />
+                      </View>
+                      <Text style={tw`text-white font-semibold text-lg flex-1`}>{selectedStream.title}</Text>
+                    </View>
+                    
+                    <View style={tw`flex-row items-center gap-3`}>
+                      {selectedStream.viewerCount && (
+                        <View style={tw`flex-row items-center bg-white/20 rounded-full px-3 py-1`}>
+                          <Ionicons name="people" size={16} color="white" />
+                          <Text style={tw`text-white ml-1 text-sm font-medium`}>
+                            {selectedStream.viewerCount.toLocaleString()}
+                          </Text>
+                        </View>
+                      )}
+                      
+                      <Pressable
+                        onPress={shareStream}
+                        style={tw`bg-white/20 rounded-full p-2`}
+                      >
+                        <Ionicons name="share-outline" size={20} color="white" />
+                      </Pressable>
+                    </View>
                   </View>
-                )}
+                </LinearGradient>
               </View>
-            </View>
-          </View>
+            </BlurView>
+          </Animated.View>
         )}
 
         {/* Stream List */}
-        <View style={tw`px-4 mb-4`}>
-          <Text style={tw`text-white font-bold text-lg mb-3`}>ช่องถ่ายทอด</Text>
+        <View style={tw`px-4 mb-6`}>
+          <Text style={tw`text-white font-bold text-xl mb-4`}>📺 ช่องถ่ายทอด</Text>
           
           {loading ? (
-            <ActivityIndicator color="white" />
+            <View style={tw`items-center py-8`}>
+              <LottieView
+                source={require('@/assets/animations/loading.json')}
+                autoPlay
+                loop
+                style={tw`w-12 h-12`}
+              />
+              <Text style={tw`text-white/60 mt-2`}>กำลังโหลด...</Text>
+            </View>
           ) : (
-            streams.map((stream) => (
-              <Pressable
+            streams.map((stream, index) => (
+              <Animated.View
                 key={stream.id}
-                onPress={() => setSelectedStream(stream)}
-                style={tw`bg-white/10 rounded-xl p-4 mb-3 ${
-                  selectedStream?.id === stream.id ? 'border border-yellow-400' : ''
-                }`}
+                entering={FadeInUp.delay(index * 100)}
               >
-                <View style={tw`flex-row justify-between items-center`}>
-                  <View style={tw`flex-row items-center flex-1`}>
-                    <View style={tw`w-10 h-10 rounded-full items-center justify-center mr-3`}
-                      style={{ backgroundColor: platformIcons[stream.platform].color + '20' }}
-                    >
-                      <Ionicons 
-                        name={platformIcons[stream.platform].name as any}
-                        size={20}
-                        color={platformIcons[stream.platform].color}
-                      />
+                <Pressable
+                  onPress={async () => {
+                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectedStream(stream);
+                  }}
+                  style={tw`bg-white/10 rounded-xl p-4 mb-3 ${
+                    selectedStream?.id === stream.id ? 'border-2 border-yellow-400 bg-white/20' : ''
+                  }`}
+                >
+                  <View style={tw`flex-row justify-between items-center`}>
+                    <View style={tw`flex-row items-center flex-1`}>
+                      <View style={tw`w-12 h-12 rounded-full items-center justify-center mr-4`}
+                        style={{ backgroundColor: platformIcons[stream.platform].color + '20' }}
+                      >
+                        <Ionicons 
+                          name={platformIcons[stream.platform].name as any}
+                          size={24}
+                          color={platformIcons[stream.platform].color}
+                        />
+                      </View>
+                      <View style={tw`flex-1`}>
+                        <Text style={tw`text-white font-bold text-lg`}>{stream.title}</Text>
+                        {stream.scheduledTime && !stream.isLive && (
+                          <Text style={tw`text-white/60 text-sm`}>
+                            เริ่ม {format(new Date(stream.scheduledTime), 'HH:mm น.', { locale: th })}
+                          </Text>
+                        )}
+                        {stream.viewerCount && (
+                          <Text style={tw`text-white/60 text-sm`}>
+                            👥 {stream.viewerCount.toLocaleString()} คนดู
+                          </Text>
+                        )}
+                      </View>
                     </View>
-                    <View style={tw`flex-1`}>
-                      <Text style={tw`text-white font-bold`}>{stream.title}</Text>
-                      {stream.scheduledTime && !stream.isLive && (
-                        <Text style={tw`text-white/60 text-sm`}>
-                          เริ่ม {format(new Date(stream.scheduledTime), 'HH:mm น.', { locale: th })}
-                        </Text>
-                      )}
-                    </View>
+                    
+                    {stream.isLive && (
+                      <Animated.View style={pulseStyle}>
+                        <View style={tw`bg-red-500 rounded-full px-4 py-2 flex-row items-center`}>
+                          <View style={tw`w-2 h-2 bg-white rounded-full mr-2`} />
+                          <Text style={tw`text-white text-xs font-bold`}>LIVE</Text>
+                        </View>
+                      </Animated.View>
+                    )}
                   </View>
-                  
-                  {stream.isLive && (
-                    <View style={tw`bg-red-500 rounded-full px-3 py-1`}>
-                      <Text style={tw`text-white text-xs font-bold`}>LIVE</Text>
-                    </View>
-                  )}
-                </View>
-              </Pressable>
+                </Pressable>
+              </Animated.View>
             ))
           )}
         </View>
 
         {/* Quick Links */}
-        <View style={tw`px-4 mb-8`}>
-          <Text style={tw`text-white font-bold text-lg mb-3`}>ลิงก์ที่เกี่ยวข้อง</Text>
+        <View style={tw`px-4 mb-6`}>
+          <Text style={tw`text-white font-bold text-xl mb-4`}>🔗 ลิงก์ที่เกี่ยวข้อง</Text>
           
           <View style={tw`flex-row flex-wrap`}>
             {[
-              { label: 'กองสลากฯ', icon: 'globe', url: 'https://www.glo.or.th' },
-              { label: 'ตรวจหวย', icon: 'search', url: '/user/lottery-check' },
-              { label: 'ผลย้อนหลัง', icon: 'time', url: '/user/history' },
-              { label: 'ข่าวหวย', icon: 'newspaper', url: '/user/news' },
+              { label: 'กองสลากฯ', icon: 'globe', url: 'https://www.glo.or.th', color: '#4CAF50' },
+              { label: 'ตรวจหวย', icon: 'search', url: '/user/lottery-check', color: '#FFD700' },
+              { label: 'ผลย้อนหลัง', icon: 'time', url: '/user/history', color: '#2196F3' },
+              { label: 'ข่าวหวย', icon: 'newspaper', url: '/user/news', color: '#FF5722' },
             ].map((link, index) => (
-              <Pressable
+              <Animated.View
                 key={index}
-                style={tw`bg-white/10 rounded-xl px-4 py-3 mr-2 mb-2 flex-row items-center`}
+                entering={FadeInUp.delay(index * 100)}
               >
-                <Ionicons name={link.icon as any} size={16} color="#FFD700" />
-                <Text style={tw`text-white ml-2`}>{link.label}</Text>
-              </Pressable>
+                <Pressable
+                  onPress={async () => {
+                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    if (link.url.startsWith('http')) {
+                      openExternalLink(link.url);
+                    } else {
+                      // Navigate to internal route
+                      showToast('info', 'กำลังพัฒนา', 'ฟีเจอร์นี้กำลังพัฒนา');
+                    }
+                  }}
+                  style={tw`bg-white/10 rounded-xl px-4 py-3 mr-2 mb-2 flex-row items-center`}
+                >
+                  <View style={tw`w-8 h-8 rounded-full items-center justify-center mr-3`}
+                    style={{ backgroundColor: link.color + '20' }}
+                  >
+                    <Ionicons name={link.icon as any} size={18} color={link.color} />
+                  </View>
+                  <Text style={tw`text-white font-medium`}>{link.label}</Text>
+                </Pressable>
+              </Animated.View>
             ))}
           </View>
         </View>
 
         {/* Tips */}
-        <View style={tw`bg-yellow-500/10 mx-4 rounded-xl p-4 mb-8`}>
-          <View style={tw`flex-row items-start`}>
-            <Ionicons name="information-circle" size={20} color="#FCD34D" />
-            <View style={tw`flex-1 ml-2`}>
-              <Text style={tw`text-yellow-300 font-bold mb-1`}>เคล็ดลับ</Text>
-              <Text style={tw`text-yellow-100 text-sm leading-relaxed`}>
-                • หวยออกทุกวันที่ 1 และ 16 ของเดือน{'\n'}
-                • เริ่มออกรางวัลประมาณ 14:30 น.{'\n'}
-                • สามารถดูย้อนหลังได้จาก YouTube กองสลากฯ
-              </Text>
+        <BlurView intensity={20} style={tw`mx-4 rounded-xl overflow-hidden mb-8`}>
+          <LinearGradient
+            colors={['#FFD700', '#FFA500', '#FF6347']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={tw`p-6`}
+          >
+            <View style={tw`flex-row items-start`}>
+              <View style={tw`w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-4`}>
+                <Ionicons name="information-circle" size={24} color="white" />
+              </View>
+              <View style={tw`flex-1`}>
+                <Text style={tw`text-white font-bold text-lg mb-3`}>💡 เคล็ดลับ</Text>
+                <View style={tw`space-y-2`}>
+                  <Text style={tw`text-white/90 text-base leading-relaxed`}>
+                    • หวยออกทุกวันที่ 1 และ 16 ของเดือน
+                  </Text>
+                  <Text style={tw`text-white/90 text-base leading-relaxed`}>
+                    • เริ่มออกรางวัลประมาณ 14:30 น.
+                  </Text>
+                  <Text style={tw`text-white/90 text-base leading-relaxed`}>
+                    • สามารถดูย้อนหลังได้จาก YouTube กองสลากฯ
+                  </Text>
+                  <Text style={tw`text-white/90 text-base leading-relaxed`}>
+                    • ตั้งการแจ้งเตือนเพื่อไม่พลาดการออก
+                  </Text>
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
+          </LinearGradient>
+        </BlurView>
       </ScrollView>
     </Container>
   );

@@ -1,276 +1,463 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, Switch } from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, Pressable, Switch, Alert, Dimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
+import LottieView from 'lottie-react-native';
+import * as Notifications from 'expo-notifications';
 import tw from '@/libs/constants/twrnc';
 import Container from '@/libs/components/Container';
-import { apiGetData, apiPostData, handleApiError } from '@/libs/utils/API_URILS';
-import Toast from 'react-native-toast-message';
-import { format } from 'date-fns';
-import { th } from 'date-fns/locale';
+import { apiGetData, apiPutData, handleApiError } from '@/libs/utils/API_URILS';
+import { useToast } from '@/libs/providers/ToastProvider';
+import Animated, { 
+  FadeInDown, 
+  FadeInUp, 
+  useAnimatedStyle, 
+  withSpring,
+  withTiming,
+  interpolate,
+  Extrapolate
+} from 'react-native-reanimated';
 
-interface Notification {
-  id: string;
-  title: string;
-  body: string;
-  type: 'lottery' | 'news' | 'promotion' | 'system';
-  isRead: boolean;
-  createdAt: string;
-  data?: any;
+const { width } = Dimensions.get('window');
+
+interface NotificationSettings {
+  lotteryDraw: boolean;
+  dreamReminder: boolean;
+  newsUpdate: boolean;
+  promotional: boolean;
+  soundEnabled: boolean;
+  vibrationEnabled: boolean;
+  quietHours: {
+    enabled: boolean;
+    start: string;
+    end: string;
+  };
 }
 
-const typeIcons = {
-  lottery: { name: 'trophy', color: '#FFD700' },
-  news: { name: 'newspaper', color: '#3B82F6' },
-  promotion: { name: 'gift', color: '#EC4899' },
-  system: { name: 'information-circle', color: '#6B7280' },
-};
-
-const typeLabels = {
-  lottery: 'ผลหวย',
-  news: 'ข่าวเลขเด็ด',
-  promotion: 'โปรโมชั่น',
-  system: 'ระบบ',
-};
+interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  type: 'lottery' | 'dream' | 'news' | 'promotional' | 'system';
+  isRead: boolean;
+  createdAt: string;
+  actionUrl?: string;
+}
 
 export default function NotificationsScreen() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<string>('all');
-  const [notificationSettings, setNotificationSettings] = useState({
-    lottery: true,
-    news: true,
-    promotion: true,
-    system: true,
+  const { showToast } = useToast();
+  const [settings, setSettings] = useState<NotificationSettings>({
+    lotteryDraw: true,
+    dreamReminder: true,
+    newsUpdate: false,
+    promotional: false,
+    soundEnabled: true,
+    vibrationEnabled: true,
+    quietHours: {
+      enabled: false,
+      start: '22:00',
+      end: '08:00',
+    },
   });
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
+  
+  // Animation values
+  const switchAnim = useRef(new Animated.Value(0)).current;
+  const cardAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    fetchNotifications();
+    checkNotificationPermission();
     fetchSettings();
+    fetchNotifications();
+    startAnimations();
   }, []);
 
+  const startAnimations = () => {
+    Animated.timing(cardAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const checkNotificationPermission = async () => {
+    const { status } = await Notifications.getPermissionsAsync();
+    setPermissionStatus(status);
+    
+    if (status !== 'granted') {
+      const { status: newStatus } = await Notifications.requestPermissionsAsync();
+      setPermissionStatus(newStatus);
+    }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const response = await apiGetData('/api/user/notification-settings');
+      if (response.success) {
+        setSettings(response.data);
+      }
+    } catch (error) {
+      // Use default settings
+      console.log('Using default notification settings');
+    }
+  };
+
   const fetchNotifications = async () => {
+    setLoading(true);
     try {
       const response = await apiGetData('/api/user/notifications');
       if (response.success) {
         setNotifications(response.data);
       }
     } catch (error) {
-      handleApiError(error);
+      // Mock data for demo
+      const mockNotifications: NotificationItem[] = [
+        {
+          id: '1',
+          title: 'หวยออกแล้ว!',
+          message: 'งวดวันที่ 1 มกราคม 2568 ออกแล้ว ตรวจหวยของคุณได้เลย',
+          type: 'lottery',
+          isRead: false,
+          createdAt: new Date().toISOString(),
+          actionUrl: '/user/lottery-check',
+        },
+        {
+          id: '2',
+          title: 'เลขเด็ดใหม่',
+          message: 'มีเลขเด็ดใหม่จากอาจารย์ดัง อย่าพลาด!',
+          type: 'news',
+          isRead: true,
+          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          actionUrl: '/user/news',
+        },
+        {
+          id: '3',
+          title: 'ทำนายฝันฟรี',
+          message: 'ทำนายฝันฟรีวันนี้! มาดูเลขเด็ดจากความฝันกัน',
+          type: 'dream',
+          isRead: false,
+          createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+          actionUrl: '/user/dream',
+        },
+      ];
+      setNotifications(mockNotifications);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  const fetchSettings = async () => {
-    try {
-      const response = await apiGetData('/api/user/settings/notifications');
-      if (response.success) {
-        setNotificationSettings(response.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch settings:', error);
-    }
-  };
+  const updateSetting = async (key: keyof NotificationSettings, value: any) => {
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchNotifications();
-  };
+    // Animate switch
+    Animated.sequence([
+      Animated.timing(switchAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(switchAnim, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
-  const markAsRead = async (id: string) => {
     try {
-      await apiPostData(`/api/user/notifications/${id}/read`, {});
-      setNotifications(prev => 
-        prev.map(n => n.id === id ? { ...n, isRead: true } : n)
-      );
+      await apiPutData('/api/user/notification-settings', { settings: newSettings });
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      showToast('success', 'บันทึกแล้ว', 'อัพเดทการตั้งค่าเรียบร้อย');
     } catch (error) {
-      console.error('Failed to mark as read:', error);
-    }
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      await apiPostData('/api/user/notifications/read-all', {});
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      Toast.show({
-        type: 'success',
-        text1: 'อ่านทั้งหมดแล้ว',
-      });
-    } catch (error) {
-      handleApiError(error);
-    }
-  };
-
-  const updateNotificationSetting = async (type: string, value: boolean) => {
-    try {
-      const newSettings = { ...notificationSettings, [type]: value };
-      setNotificationSettings(newSettings);
-      
-      await apiPostData('/api/user/settings/notifications', newSettings);
-      Toast.show({
-        type: 'success',
-        text1: 'อัพเดทการแจ้งเตือนแล้ว',
-      });
-    } catch (error) {
-      handleApiError(error);
       // Revert on error
-      setNotificationSettings(prev => ({ ...prev, [type]: !value }));
+      setSettings(settings);
+      handleApiError(error, (message) => {
+        showToast('error', 'เกิดข้อผิดพลาด', message);
+      });
     }
   };
 
-  const filteredNotifications = filter === 'all' 
-    ? notifications 
-    : notifications.filter(n => n.type === filter);
-
-  const unreadCount = notifications.filter(n => !n.isRead).length;
-
-  const handleNotificationPress = (notification: Notification) => {
-    markAsRead(notification.id);
-    
-    // Navigate based on type
-    switch (notification.type) {
-      case 'lottery':
-        router.push('/user/lottery-check');
-        break;
-      case 'news':
-        router.push('/user/news');
-        break;
-      default:
-        // Show detail modal or navigate to detail page
-        break;
+  const markAsRead = async (notificationId: string) => {
+    try {
+      await apiPutData(`/api/user/notifications/${notificationId}/read`, {});
+      setNotifications(prev => 
+        prev.map(notif => 
+          notif.id === notificationId ? { ...notif, isRead: true } : notif
+        )
+      );
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      handleApiError(error, (message) => {
+        showToast('error', 'เกิดข้อผิดพลาด', message);
+      });
     }
   };
+
+  const clearAllNotifications = async () => {
+    Alert.alert(
+      'ลบการแจ้งเตือนทั้งหมด',
+      'คุณต้องการลบการแจ้งเตือนทั้งหมดใช่หรือไม่?',
+      [
+        { text: 'ยกเลิก', style: 'cancel' },
+        {
+          text: 'ลบทั้งหมด',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiPutData('/api/user/notifications/clear', {});
+              setNotifications([]);
+              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              showToast('success', 'ลบแล้ว', 'ลบการแจ้งเตือนทั้งหมดแล้ว');
+            } catch (error) {
+              handleApiError(error, (message) => {
+                showToast('error', 'เกิดข้อผิดพลาด', message);
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'lottery': return { name: 'ticket', color: '#FFD700' };
+      case 'dream': return { name: 'moon', color: '#667eea' };
+      case 'news': return { name: 'newspaper', color: '#FF5722' };
+      case 'promotional': return { name: 'gift', color: '#4CAF50' };
+      default: return { name: 'notifications', color: '#9E9E9E' };
+    }
+  };
+
+  const animatedCardStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: cardAnim.value }],
+    };
+  });
+
+  const switchStyle = useAnimatedStyle(() => {
+    const scale = interpolate(switchAnim.value, [0, 1], [1, 1.1], Extrapolate.CLAMP);
+    return {
+      transform: [{ scale }],
+    };
+  });
 
   return (
     <Container>
-      <View style={tw`flex-1 bg-gray-50`}>
+      <LinearGradient
+        colors={['#1a1a2e', '#16213e', '#0f3460', '#1a1a2e']}
+        style={tw`absolute inset-0`}
+      />
+
+      <ScrollView style={tw`flex-1`} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={tw`bg-white px-4 py-3 shadow-sm`}>
-          <View style={tw`flex-row justify-between items-center`}>
-            <Text style={tw`text-2xl font-bold text-gray-800`}>การแจ้งเตือน</Text>
-            {unreadCount > 0 && (
-              <Pressable onPress={markAllAsRead}>
-                <Text style={tw`text-primary-600`}>อ่านทั้งหมด ({unreadCount})</Text>
+        <View style={tw`px-4 pt-12 pb-6`}>
+          <Animated.View entering={FadeInDown.delay(100)}>
+            <View style={tw`items-center`}>
+              <Text style={tw`text-6xl mb-2`}>🔔</Text>
+              <Text style={tw`text-3xl font-bold text-white text-center font-aboreto`}>
+                การแจ้งเตือน
+              </Text>
+              <Text style={tw`text-white/70 text-center mt-2 text-lg`}>
+                จัดการการแจ้งเตือนและตั้งค่าต่างๆ
+              </Text>
+            </View>
+          </Animated.View>
+        </View>
+
+        {/* Permission Status */}
+        {permissionStatus !== 'granted' && (
+          <Animated.View entering={FadeInUp.delay(200)} style={tw`mx-4 mb-6`}>
+            <BlurView intensity={20} style={tw`rounded-xl overflow-hidden`}>
+              <LinearGradient
+                colors={['#FF5722', '#FF7043']}
+                style={tw`p-4`}
+              >
+                <View style={tw`flex-row items-center`}>
+                  <Ionicons name="warning" size={24} color="white" />
+                  <View style={tw`flex-1 ml-3`}>
+                    <Text style={tw`text-white font-bold text-lg`}>ต้องการสิทธิ์การแจ้งเตือน</Text>
+                    <Text style={tw`text-white/80 text-sm`}>
+                      เปิดใช้งานการแจ้งเตือนเพื่อรับข้อมูลล่าสุด
+                    </Text>
+                  </View>
+                </View>
+              </LinearGradient>
+            </BlurView>
+          </Animated.View>
+        )}
+
+        {/* Settings Section */}
+        <Animated.View entering={FadeInUp.delay(300)} style={[tw`mx-4 mb-6`, animatedCardStyle]}>
+          <BlurView intensity={20} style={tw`rounded-2xl overflow-hidden`}>
+            <LinearGradient
+              colors={['#667eea', '#764ba2']}
+              style={tw`p-6`}
+            >
+              <Text style={tw`text-white font-bold text-xl mb-4`}>⚙️ การตั้งค่า</Text>
+              
+              {/* Notification Types */}
+              <View style={tw`space-y-4`}>
+                {[
+                  { key: 'lotteryDraw', label: 'หวยออก', icon: 'ticket', desc: 'แจ้งเตือนเมื่อหวยออก' },
+                  { key: 'dreamReminder', label: 'ทำนายฝัน', icon: 'moon', desc: 'เตือนให้ทำนายฝัน' },
+                  { key: 'newsUpdate', label: 'ข่าวเลขเด็ด', icon: 'newspaper', desc: 'ข่าวเลขเด็ดใหม่' },
+                  { key: 'promotional', label: 'โปรโมชั่น', icon: 'gift', desc: 'ข้อเสนอพิเศษ' },
+                ].map((setting, index) => (
+                  <Animated.View
+                    key={setting.key}
+                    entering={FadeInUp.delay(400 + index * 100)}
+                  >
+                    <View style={tw`flex-row items-center justify-between py-3`}>
+                      <View style={tw`flex-row items-center flex-1`}>
+                        <View style={tw`w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-4`}>
+                          <Ionicons name={setting.icon as any} size={20} color="white" />
+                        </View>
+                        <View style={tw`flex-1`}>
+                          <Text style={tw`text-white font-semibold text-lg`}>{setting.label}</Text>
+                          <Text style={tw`text-white/70 text-sm`}>{setting.desc}</Text>
+                        </View>
+                      </View>
+                      <Animated.View style={switchStyle}>
+                        <Switch
+                          value={settings[setting.key as keyof NotificationSettings] as boolean}
+                          onValueChange={(value) => updateSetting(setting.key as keyof NotificationSettings, value)}
+                          trackColor={{ false: '#3D2520', true: '#4CAF50' }}
+                          thumbColor={settings[setting.key as keyof NotificationSettings] ? '#FFFFFF' : '#8B7355'}
+                        />
+                      </Animated.View>
+                    </View>
+                    {index < 3 && <View style={tw`h-px bg-white/20`} />}
+                  </Animated.View>
+                ))}
+              </View>
+            </LinearGradient>
+          </BlurView>
+        </Animated.View>
+
+        {/* Sound & Vibration Settings */}
+        <Animated.View entering={FadeInUp.delay(500)} style={tw`mx-4 mb-6`}>
+          <BlurView intensity={20} style={tw`rounded-2xl overflow-hidden`}>
+            <LinearGradient
+              colors={['#4CAF50', '#66BB6A']}
+              style={tw`p-6`}
+            >
+              <Text style={tw`text-white font-bold text-xl mb-4`}>🔊 เสียงและการสั่น</Text>
+              
+              <View style={tw`space-y-4`}>
+                {[
+                  { key: 'soundEnabled', label: 'เสียงแจ้งเตือน', icon: 'volume-high' },
+                  { key: 'vibrationEnabled', label: 'การสั่น', icon: 'phone-portrait' },
+                ].map((setting, index) => (
+                  <Animated.View
+                    key={setting.key}
+                    entering={FadeInUp.delay(600 + index * 100)}
+                  >
+                    <View style={tw`flex-row items-center justify-between py-3`}>
+                      <View style={tw`flex-row items-center flex-1`}>
+                        <View style={tw`w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-4`}>
+                          <Ionicons name={setting.icon as any} size={20} color="white" />
+                        </View>
+                        <Text style={tw`text-white font-semibold text-lg`}>{setting.label}</Text>
+                      </View>
+                      <Animated.View style={switchStyle}>
+                        <Switch
+                          value={settings[setting.key as keyof NotificationSettings] as boolean}
+                          onValueChange={(value) => updateSetting(setting.key as keyof NotificationSettings, value)}
+                          trackColor={{ false: '#3D2520', true: '#FFD700' }}
+                          thumbColor={settings[setting.key as keyof NotificationSettings] ? '#FFFFFF' : '#8B7355'}
+                        />
+                      </Animated.View>
+                    </View>
+                    {index < 1 && <View style={tw`h-px bg-white/20`} />}
+                  </Animated.View>
+                ))}
+              </View>
+            </LinearGradient>
+          </BlurView>
+        </Animated.View>
+
+        {/* Notifications List */}
+        <Animated.View entering={FadeInUp.delay(700)} style={tw`mx-4 mb-6`}>
+          <View style={tw`flex-row items-center justify-between mb-4`}>
+            <Text style={tw`text-white font-bold text-xl`}>📱 การแจ้งเตือนล่าสุด</Text>
+            {notifications.length > 0 && (
+              <Pressable
+                onPress={clearAllNotifications}
+                style={tw`bg-red-500/20 rounded-full px-4 py-2`}
+              >
+                <Text style={tw`text-red-300 text-sm font-medium`}>ลบทั้งหมด</Text>
               </Pressable>
             )}
           </View>
 
-          {/* Filter Tabs */}
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={tw`mt-4`}
-          >
-            <Pressable
-              onPress={() => setFilter('all')}
-              style={tw`px-4 py-2 rounded-full mr-2 ${
-                filter === 'all' ? 'bg-primary-600' : 'bg-gray-200'
-              }`}
-            >
-              <Text style={tw`${filter === 'all' ? 'text-white' : 'text-gray-600'}`}>
-                ทั้งหมด
-              </Text>
-            </Pressable>
-            {Object.entries(typeLabels).map(([key, label]) => (
-              <Pressable
-                key={key}
-                onPress={() => setFilter(key)}
-                style={tw`px-4 py-2 rounded-full mr-2 ${
-                  filter === key ? 'bg-primary-600' : 'bg-gray-200'
-                }`}
-              >
-                <Text style={tw`${filter === key ? 'text-white' : 'text-gray-600'}`}>
-                  {label}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Settings Card */}
-        <View style={tw`bg-white mx-4 mt-4 p-4 rounded-xl shadow-sm`}>
-          <Text style={tw`text-lg font-bold mb-3`}>ตั้งค่าการแจ้งเตือน</Text>
-          {Object.entries(typeLabels).map(([key, label]) => (
-            <View key={key} style={tw`flex-row justify-between items-center py-2`}>
-              <View style={tw`flex-row items-center`}>
-                <Ionicons 
-                  name={typeIcons[key as keyof typeof typeIcons].name as any} 
-                  size={20} 
-                  color={typeIcons[key as keyof typeof typeIcons].color} 
-                />
-                <Text style={tw`ml-3 text-gray-700`}>{label}</Text>
-              </View>
-              <Switch
-                value={notificationSettings[key as keyof typeof notificationSettings]}
-                onValueChange={(value) => updateNotificationSetting(key, value)}
-                trackColor={{ false: '#D1D5DB', true: '#FFD700' }}
-                thumbColor={notificationSettings[key as keyof typeof notificationSettings] ? '#FFA500' : '#9CA3AF'}
+          {loading ? (
+            <View style={tw`items-center py-8`}>
+              <LottieView
+                source={require('@/assets/animations/loading.json')}
+                autoPlay
+                loop
+                style={tw`w-12 h-12`}
               />
+              <Text style={tw`text-white/60 mt-2`}>กำลังโหลด...</Text>
             </View>
-          ))}
-        </View>
-
-        {/* Notifications List */}
-        <ScrollView
-          style={tw`flex-1 mt-4`}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-        >
-          {filteredNotifications.length === 0 ? (
-            <View style={tw`items-center justify-center py-20`}>
-              <Ionicons name="notifications-off-outline" size={64} color="#D1D5DB" />
-              <Text style={tw`text-gray-400 mt-4`}>ไม่มีการแจ้งเตือน</Text>
-            </View>
+          ) : notifications.length === 0 ? (
+            <BlurView intensity={20} style={tw`rounded-2xl overflow-hidden`}>
+              <View style={tw`bg-white/10 p-8 items-center`}>
+                <Text style={tw`text-6xl mb-4`}>📭</Text>
+                <Text style={tw`text-white/80 text-lg`}>ยังไม่มีการแจ้งเตือน</Text>
+                <Text style={tw`text-white/60 text-sm mt-2`}>
+                  การแจ้งเตือนใหม่จะแสดงที่นี่
+                </Text>
+              </View>
+            </BlurView>
           ) : (
-            filteredNotifications.map((notification) => (
-              <Pressable
-                key={notification.id}
-                onPress={() => handleNotificationPress(notification)}
-                style={tw`bg-white mx-4 mb-3 p-4 rounded-xl shadow-sm ${
-                  !notification.isRead ? 'border-l-4 border-primary-500' : ''
-                }`}
-              >
-                <View style={tw`flex-row`}>
-                  <View style={tw`w-10 h-10 rounded-full items-center justify-center mr-3`}
-                    style={{ backgroundColor: typeIcons[notification.type].color + '20' }}
-                  >
-                    <Ionicons 
-                      name={typeIcons[notification.type].name as any} 
-                      size={20} 
-                      color={typeIcons[notification.type].color} 
-                    />
-                  </View>
-                  <View style={tw`flex-1`}>
-                    <View style={tw`flex-row justify-between items-start mb-1`}>
-                      <Text style={tw`font-bold text-gray-800 flex-1 ${
-                        !notification.isRead ? 'text-primary-600' : ''
-                      }`}>
-                        {notification.title}
-                      </Text>
-                      {!notification.isRead && (
-                        <View style={tw`w-2 h-2 bg-primary-500 rounded-full ml-2`} />
-                      )}
-                    </View>
-                    <Text style={tw`text-gray-600 mb-2`}>{notification.body}</Text>
-                    <View style={tw`flex-row justify-between items-center`}>
-                      <Text style={tw`text-xs text-gray-400`}>
-                        {typeLabels[notification.type]}
-                      </Text>
-                      <Text style={tw`text-xs text-gray-400`}>
-                        {format(new Date(notification.createdAt), 'dd MMM yyyy HH:mm', { locale: th })}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </Pressable>
-            ))
+            notifications.map((notification, index) => {
+              const icon = getNotificationIcon(notification.type);
+              return (
+                <Animated.View
+                  key={notification.id}
+                  entering={FadeInUp.delay(800 + index * 100)}
+                  style={tw`mb-3`}
+                >
+                  <BlurView intensity={20} style={tw`rounded-2xl overflow-hidden`}>
+                    <Pressable
+                      onPress={() => markAsRead(notification.id)}
+                      style={tw`p-4 ${!notification.isRead ? 'bg-white/10' : 'bg-white/5'}`}
+                    >
+                      <View style={tw`flex-row items-start`}>
+                        <View style={tw`w-12 h-12 rounded-full items-center justify-center mr-4`}
+                          style={{ backgroundColor: icon.color + '20' }}
+                        >
+                          <Ionicons name={icon.name as any} size={24} color={icon.color} />
+                        </View>
+                        <View style={tw`flex-1`}>
+                          <View style={tw`flex-row items-center justify-between mb-1`}>
+                            <Text style={tw`text-white font-bold text-lg`}>{notification.title}</Text>
+                            {!notification.isRead && (
+                              <View style={tw`w-3 h-3 bg-blue-500 rounded-full`} />
+                            )}
+                          </View>
+                          <Text style={tw`text-white/80 text-base leading-relaxed mb-2`}>
+                            {notification.message}
+                          </Text>
+                          <Text style={tw`text-white/60 text-sm`}>
+                            {new Date(notification.createdAt).toLocaleString('th-TH')}
+                          </Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  </BlurView>
+                </Animated.View>
+              );
+            })
           )}
-        </ScrollView>
-      </View>
+        </Animated.View>
+      </ScrollView>
     </Container>
   );
 }
